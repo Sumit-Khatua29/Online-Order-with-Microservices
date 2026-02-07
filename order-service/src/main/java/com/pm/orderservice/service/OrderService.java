@@ -48,14 +48,25 @@ public class OrderService {
                 .bodyToMono(InventoryResponse[].class)
                 .block();
 
-       boolean allProductsInStock =  Arrays.stream(inventoryResponsesArray)
-               .allMatch(inventoryResponse -> inventoryResponse.isInStock());
+        boolean allProductsInStock = Arrays.stream(inventoryResponsesArray)
+                .allMatch(InventoryResponse::isInStock);
 
-       if(allProductsInStock && inventoryResponsesArray.length == skuCodes.size()){
-           orderRepository.save(order);
-       } else {
-           throw new IllegalArgumentException("Product is not in stock, please try again later");
-       }
+        if(allProductsInStock && inventoryResponsesArray.length > 0){
+            // Verify that all requested SKUs are present in the response
+            // This handles cases where some SKUs are missing but others are duplicated
+             boolean allRequestedProductsFound = Arrays.stream(inventoryResponsesArray)
+                     .map(InventoryResponse::getSkuCode)
+                     .collect(java.util.stream.Collectors.toSet())
+                     .containsAll(skuCodes);
+
+             if (allRequestedProductsFound) {
+                 orderRepository.save(order);
+             } else {
+                 throw new IllegalArgumentException("Product is not in stock, please try again later");
+             }
+        } else {
+            throw new IllegalArgumentException("Product is not in stock, please try again later");
+        }
     }
 
     private Object maptoDto(OrderLineItemsDto orderLineItemsDto) {
